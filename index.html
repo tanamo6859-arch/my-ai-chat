@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI相談室</title>
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --bg-color: #f8fafc;
+      --chat-user: #4f46e5;
+      --chat-ai: #ffffff;
+      --text-main: #1e293b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+    }
+    header {
+      background: #ffffff;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    header h1 { font-size: 1.1rem; color: #0f172a; }
+    .new-chat-btn {
+      background: none;
+      border: 1px solid #cbd5e1;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .new-chat-btn:hover { background: #f1f5f9; }
+    #chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .message {
+      display: flex;
+      flex-direction: column;
+      max-width: 80%;
+      line-height: 1.6;
+      font-size: 0.95rem;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+    .message.user {
+      align-self: flex-end;
+      background-color: var(--chat-user);
+      color: #ffffff;
+      padding: 12px 16px;
+      border-radius: 18px 18px 4px 18px;
+    }
+    .message.ai {
+      align-self: flex-start;
+      background-color: var(--chat-ai);
+      padding: 12px 16px;
+      border-radius: 18px 18px 18px 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      border: 1px solid #e2e8f0;
+    }
+    .loading-indicator {
+      display: none;
+      align-self: flex-start;
+      background: var(--chat-ai);
+      padding: 10px 16px;
+      border-radius: 18px 18px 18px 4px;
+      font-size: 0.85rem;
+      color: #64748b;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .input-area {
+      background: #ffffff;
+      padding: 12px 16px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      gap: 8px;
+    }
+    textarea {
+      flex: 1;
+      resize: none;
+      height: 48px;
+      padding: 10px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 24px;
+      font-size: 0.95rem;
+      outline: none;
+      font-family: inherit;
+    }
+    textarea:focus { border-color: var(--primary); }
+    .send-btn {
+      background-color: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 0 18px;
+      border-radius: 24px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .send-btn:disabled { background-color: #94a3b8; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AI お悩み相談室</h1>
+    <button class="new-chat-btn" id="newChatBtn">新しい相談を始める</button>
+  </header>
+
+  <main id="chat-container">
+    <div class="message ai">こんにちは！何か気になることやお悩みのことはありますか？お気軽にお話しくださいね。</div>
+    <div class="loading-indicator" id="loading">AIが考え中...</div>
+  </main>
+
+  <div class="input-area">
+    <textarea id="userInput" placeholder="相談内容を入力してください (Shift+Enterで改行)"></textarea>
+    <button class="send-btn" id="sendBtn">送信</button>
+  </div>
+
+  <script>
+    const chatContainer = document.getElementById('chat-container');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const loading = document.getElementById('loading');
+    const newChatBtn = document.getElementById('newChatBtn');
+
+    let conversationHistory = [];
+
+    function appendMessage(text, sender) {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `message ${sender}`;
+      msgDiv.textContent = text;
+      chatContainer.insertBefore(msgDiv, loading);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const text = userInput.value.trim();
+      if (!text || sendBtn.disabled) return;
+
+      appendMessage(text, 'user');
+      userInput.value = '';
+      sendBtn.disabled = true;
+      loading.style.display = 'block';
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+
+      conversationHistory.push({
+        role: 'user',
+        parts: [{ text: text }]
+      });
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: conversationHistory })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'エラーが発生しました。');
+
+        appendMessage(data.reply, 'ai');
+        conversationHistory.push({
+          role: 'model',
+          parts: [{ text: data.reply }]
+        });
+      } catch (err) {
+        appendMessage(err.message, 'system-error');
+      } finally {
+        loading.style.display = 'none';
+        sendBtn.disabled = false;
+        userInput.focus();
+      }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    userInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    newChatBtn.addEventListener('click', () => {
+      if (confirm('現在の相談内容をリセットして新しく始めますか？')) {
+        conversationHistory = [];
+        chatContainer.querySelectorAll('.message').forEach(el => el.remove());
+        appendMessage('こんにちは！新しい相談内容を教えてください。', 'ai');
+      }
+    });
+  </script>
+</body>
+</html>
