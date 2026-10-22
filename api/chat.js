@@ -3,9 +3,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: '許可されていないリクエストです。' });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  // 前後の余計な空白を自動で取り除く
+  const apiKey = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim() : null;
   if (!apiKey) {
-    return res.status(500).json({ error: 'サーバー側にAPIキーが設定されていません。' });
+    return res.status(500).json({ error: 'VercelにGEMINI_API_KEYが登録されていません。' });
   }
 
   const { contents } = req.body;
@@ -14,7 +15,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // 最新のGeminiモデルを指定
+    const model = 'gemini-2.5-flash';
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -28,8 +31,10 @@ export default async function handler(req, res) {
     });
 
     if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      const detail = errData?.error?.message || `エラー番号: ${response.status}`;
       return res.status(response.status).json({
-        error: 'AIからの応答取得に失敗しました。時間をおいて再度お試しください。'
+        error: `Google側エラー: ${detail}`
       });
     }
 
@@ -40,7 +45,7 @@ export default async function handler(req, res) {
 
   } catch (error) {
     return res.status(500).json({
-      error: '通信エラーが発生しました。インターネット接続を確認してください。'
+      error: `通信エラー: ${error.message}`
     });
   }
 }
