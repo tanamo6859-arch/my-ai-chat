@@ -3,7 +3,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: '許可されていないリクエストです。' });
   }
 
-  // 前後の余計な空白を自動で取り除く
   const apiKey = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim() : null;
   if (!apiKey) {
     return res.status(500).json({ error: 'VercelにGEMINI_API_KEYが登録されていません。' });
@@ -15,8 +14,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 最新のGeminiモデルを指定
-    const model = 'gemini-2.5-flash';
+    // Google指定の最新モデル「gemini-3.8-flash」に変更
+    const model = 'gemini-3.8-flash';
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const response = await fetch(apiUrl, {
